@@ -5,25 +5,21 @@ import lesson_6.entity.Student;
 import lesson_6.mapper.StudentMapper;
 import lesson_6.repository.StudentRepository;
 import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@RequiredArgsConstructor
 public class StudentServiceImpl implements StudentService {
     private final StudentRepository studentRepository;
     private final StudentMapper studentMapper;
-    private final Cache cache;
-
-    public StudentServiceImpl(StudentRepository studentRepository, StudentMapper studentMapper, CacheManager cacheManager) {
-        this.studentRepository = studentRepository;
-        this.studentMapper = studentMapper;
-        this.cache = cacheManager.getCache("students");
-    }
 
 
     @Override
@@ -33,33 +29,27 @@ public class StudentServiceImpl implements StudentService {
     }
 
     @Override
+    @CachePut(value = "students", key = "#updatedStudent.id")
     public Student update(@NonNull Student updatedStudent) {
         Student student = get(updatedStudent.getId());
         student.setName(updatedStudent.getName());
         student.setAge(updatedStudent.getAge());
-        studentRepository.save(student);
-        cache.put(updatedStudent.getId(), student);
-        return student;
+        return studentRepository.save(student);
     }
 
     @Override
+    @CacheEvict(value = "students", key = "#id")
     public void delete(@NonNull Long id) {
         studentRepository.deleteById(id);
-        cache.evict(id);
     }
 
     @Override
     @SneakyThrows
+    @Cacheable(value = "students", key = "#id")
     public Student get(@NonNull Long id) {
-        Student cachedStudent = cache.get(id, Student.class);
-        if (cachedStudent != null) {
-            return cachedStudent;
-        } else {
-            Student student = studentRepository.findById(id).orElseThrow(() -> new RuntimeException("Not Found"));
-            TimeUnit.SECONDS.sleep(5);
-            cache.put(id, student);
-            return student;
-        }
+        Student student = studentRepository.findById(id).orElseThrow(() -> new RuntimeException("Not Found"));
+        TimeUnit.SECONDS.sleep(5);
+        return student;
     }
 
     @Override
