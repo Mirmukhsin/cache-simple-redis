@@ -1,13 +1,18 @@
 package lesson_6;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lesson_6.entity.Student;
 import lesson_6.repository.StudentRepository;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 
+import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 
 @SpringBootApplication
@@ -16,6 +21,19 @@ public class Lesson6Application {
 
     public static void main(String[] args) {
         SpringApplication.run(Lesson6Application.class, args);
+    }
+
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
+        cacheManager.setCacheNames(Collections.singleton("students"));
+        cacheManager.setCaffeine(caffeineCacheBuilder());
+        return cacheManager;
+    }
+
+    Caffeine<Object, Object> caffeineCacheBuilder() {
+        return Caffeine.newBuilder()
+                .expireAfterWrite(Duration.ofMinutes(5));
     }
 
     @Bean
