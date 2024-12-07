@@ -5,20 +5,26 @@ import lesson_6.entity.Student;
 import lesson_6.mapper.StudentMapper;
 import lesson_6.repository.StudentRepository;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@RequiredArgsConstructor
 public class StudentServiceImpl implements StudentService {
     private final StudentRepository studentRepository;
     private final StudentMapper studentMapper;
-    private final ConcurrentHashMap<Long, Student> studentCache = new ConcurrentHashMap<>();
+    private final Cache cache;
+
+    public StudentServiceImpl(StudentRepository studentRepository, StudentMapper studentMapper, CacheManager cacheManager) {
+        this.studentRepository = studentRepository;
+        this.studentMapper = studentMapper;
+        this.cache = cacheManager.getCache("students");
+    }
+
 
     @Override
     public Student create(@NonNull StudentCreateDto dto) {
@@ -32,26 +38,26 @@ public class StudentServiceImpl implements StudentService {
         student.setName(updatedStudent.getName());
         student.setAge(updatedStudent.getAge());
         studentRepository.save(student);
-        studentCache.put(updatedStudent.getId(), student);
+        cache.put(updatedStudent.getId(), student);
         return student;
     }
 
     @Override
     public void delete(@NonNull Long id) {
         studentRepository.deleteById(id);
-        studentCache.remove(id);
+        cache.evict(id);
     }
 
     @Override
     @SneakyThrows
     public Student get(@NonNull Long id) {
-        Student cachedStudent = studentCache.get(id);
+        Student cachedStudent = cache.get(id, Student.class);
         if (cachedStudent != null) {
             return cachedStudent;
         } else {
             Student student = studentRepository.findById(id).orElseThrow(() -> new RuntimeException("Not Found"));
             TimeUnit.SECONDS.sleep(5);
-            studentCache.put(id, student);
+            cache.put(id, student);
             return student;
         }
     }
